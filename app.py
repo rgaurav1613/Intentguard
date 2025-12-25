@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from core.intake import load_input
 from core.intent import parse_intent
 from core.validator import validate_data
