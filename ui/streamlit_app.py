@@ -2,7 +2,7 @@ import sys
 import os
 
 # -------------------------------
-# Fix Python path (RENDER SAFE)
+# FIX PYTHON PATH (RENDER SAFE)
 # -------------------------------
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -20,31 +20,31 @@ st.set_page_config(
 )
 
 st.title("🛡️ INTENTGUARD")
-st.caption("Prevention-first data execution")
+st.caption("Block → Diagnose → (Correct → Resume)")
 
 # -------------------------------
-# FILE UPLOAD
+# UPLOAD
 # -------------------------------
 st.subheader("1️⃣ Upload Data")
 
 uploaded_file = st.file_uploader(
-    "Upload CSV or Excel file",
-    type=["csv", "xlsx"]
+    "Upload CSV / Excel / TSV / JSON",
+    type=["csv", "xlsx", "xls", "tsv", "json"]
 )
 
 # -------------------------------
-# INTENT DEFINITION
+# INTENT
 # -------------------------------
 st.subheader("2️⃣ Define Intent")
 
 unique_columns = st.text_input(
-    "Columns that must be UNIQUE",
-    placeholder="customer_id"
+    "Columns that must be UNIQUE (comma separated)",
+    placeholder="id"
 )
 
 required_columns = st.text_input(
-    "Required columns",
-    placeholder="customer_id,email"
+    "Required columns (comma separated)",
+    placeholder="name,email"
 )
 
 clean_required = st.checkbox(
@@ -64,17 +64,18 @@ output_path = st.text_input(
 )
 
 # -------------------------------
-# EXECUTION
+# EXECUTE
 # -------------------------------
 st.subheader("3️⃣ Execute")
 
 if st.button("Validate & Execute"):
     if uploaded_file is None:
-        st.error("❌ Please upload a file first")
+        st.error("❌ Please upload a file")
     else:
+        # Normalize intent inputs (IMPORTANT)
         intent_input = {
-            "unique_columns": [c.strip() for c in unique_columns.split(",") if c.strip()],
-            "required_columns": [c.strip() for c in required_columns.split(",") if c.strip()],
+            "unique_columns": [c.strip().lower() for c in unique_columns.split(",") if c.strip()],
+            "required_columns": [c.strip().lower() for c in required_columns.split(",") if c.strip()],
             "clean_required": clean_required,
             "max_rows": max_rows if max_rows > 0 else None
         }
@@ -86,39 +87,41 @@ if st.button("Validate & Execute"):
                 output_path=output_path
             )
 
-        # -------------------------------
-        # RESULT HANDLING (V2.1)
-        # -------------------------------
         st.divider()
         st.subheader("Result")
 
+        # -------------------------------
+        # BLOCKED
+        # -------------------------------
         if result["status"] == "BLOCKED":
             st.error("🚫 Execution Blocked")
 
-            explanation = result["explanation"]
-
             st.markdown("### ❓ Why was this blocked?")
-            st.json(explanation)
+            st.json(result["explanation"])
 
-            if "diagnosis" in result and result["diagnosis"]:
-            st.markdown("### 📍 Where is the problem?")
-            st.json(result["diagnosis"])
+            if result.get("diagnosis"):
+                st.markdown("### 📍 Where is the problem?")
+                st.json(result["diagnosis"])
+            else:
+                st.info("No location diagnostics available for this rule.")
 
             st.info(
                 "Fix the issue in the source data and re-run. "
-                "Correction & resume will be added in V2.3."
+                "Inline correction & resume will be added in next V2 step."
             )
 
+        # -------------------------------
+        # SUCCESS
+        # -------------------------------
         else:
             st.success("✅ Execution Successful")
+
             st.json({
                 "Rows processed": result["rows"],
                 "Output file": result["output"]
             })
 
-            # -------------------------------
-            # DOWNLOAD (RENDER SAFE)
-            # -------------------------------
+            # Download (Render-safe)
             try:
                 with open(result["output"], "rb") as f:
                     st.download_button(
@@ -129,4 +132,3 @@ if st.button("Validate & Execute"):
                     )
             except Exception:
                 st.warning("Output generated but could not be loaded for download.")
-
