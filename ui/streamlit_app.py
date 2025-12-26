@@ -1,78 +1,54 @@
 import sys
 import os
-
-# ================================
-# FIX PYTHON PATH (CRITICAL)
-# ================================
-# This allows Streamlit (running from /ui)
-# to find app.py and core/
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import streamlit as st
 from app import run_intentguard
 
-# ================================
-# BASIC PAGE CONFIG
-# ================================
-st.set_page_config(
-    page_title="INTENTGUARD",
-    layout="centered"
+st.set_page_config(page_title="INTENTGUARD", layout="centered")
+
+st.title("🛡️ INTENTGUARD – Data Execution Safety")
+
+uploaded_file = st.file_uploader("Upload CSV or Excel")
+
+st.subheader("🧠 Define Intent")
+
+unique_columns = st.text_input(
+    "Columns that must be UNIQUE (comma separated)",
+    placeholder="customer_id"
 )
 
-# ================================
-# UI HEADER (DEBUG CONFIRMATION)
-# ================================
-st.title("🛡️ INTENTGUARD – Safe Execution")
-st.write("INTENTGUARD IS RUNNING ✅")
-
-# ================================
-# INPUT SECTION
-# ================================
-st.subheader("1️⃣ Upload Input Data")
-
-uploaded_file = st.file_uploader(
-    "Upload CSV or Excel file",
-    type=["csv", "xlsx"]
+required_columns = st.text_input(
+    "Required columns (comma separated)",
+    placeholder="customer_id,email"
 )
 
-st.subheader("2️⃣ Define Intent")
+clean_required = st.checkbox("Clean data before output", value=True)
 
-blocked_dates = st.text_input(
-    "Dates NOT allowed (comma separated)",
-    placeholder="2025-01-01,2025-01-26"
+max_rows = st.number_input(
+    "Maximum allowed rows (optional)",
+    min_value=0,
+    step=1000
 )
 
-critical = st.checkbox("Critical data (high risk)")
-
-st.subheader("3️⃣ Output Destination")
-
-output_path = st.text_input(
-    "Output path",
-    value="data/output"
-)
-
-# ================================
-# ACTION BUTTON
-# ================================
-st.subheader("4️⃣ Execute Safely")
+output_path = st.text_input("Output path", "data/output")
 
 if st.button("Validate & Execute"):
     if uploaded_file is None:
-        st.warning("⚠️ Please upload a file before running.")
+        st.error("Please upload a file")
     else:
-        try:
-            result = run_intentguard(
-                file=uploaded_file,
-                blocked_dates=blocked_dates,
-                critical=critical,
-                output_path=output_path
-            )
+        intent_input = {
+            "unique_columns": [c.strip() for c in unique_columns.split(",") if c.strip()],
+            "required_columns": [c.strip() for c in required_columns.split(",") if c.strip()],
+            "clean_required": clean_required,
+            "max_rows": max_rows if max_rows > 0 else None
+        }
 
-            st.success("Execution completed")
-            st.json(result)
+        result = run_intentguard(
+            file=uploaded_file,
+            intent_input=intent_input,
+            output_path=output_path
+        )
 
-        except Exception as e:
-            st.error("Execution failed ❌")
-            st.exception(e)
+        st.subheader("Result")
+        st.json(result)
