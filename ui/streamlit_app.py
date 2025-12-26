@@ -94,21 +94,21 @@ if st.button("Validate & Execute"):
         # BLOCKED
         # -------------------------------
         if result["status"] == "BLOCKED":
-            st.error("🚫 Execution Blocked")
+    st.error("🚫 Execution Blocked")
 
-            st.markdown("### ❓ Why was this blocked?")
-            st.json(result["explanation"])
+    st.markdown("### ❓ Why was this blocked?")
+    st.json(result["explanation"])
 
-            if result.get("diagnosis"):
-                st.markdown("### 📍 Where is the problem?")
-                st.json(result["diagnosis"])
-            else:
-                st.info("No location diagnostics available for this rule.")
+    if result.get("diagnosis"):
+        st.markdown("### 📍 Where is the problem?")
+        st.json(result["diagnosis"])
+    else:
+        st.info("No location diagnostics available for this rule.")
 
-            st.info(
-                "Fix the issue in the source data and re-run. "
-                "Inline correction & resume will be added in next V2 step."
-            )
+    st.info(
+        "Fix the issue in the source data and re-run. "
+        "Inline correction & resume will be added in the next V2 step."
+        )
 
         # -------------------------------
         # SUCCESS
@@ -132,3 +132,4 @@ if st.button("Validate & Execute"):
                     )
             except Exception:
                 st.warning("Output generated but could not be loaded for download.")
+
