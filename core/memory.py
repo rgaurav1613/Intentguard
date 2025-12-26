@@ -4,8 +4,10 @@ from datetime import datetime
 DB = "data/memory.db"
 
 def record_event(status, message):
+
     conn = sqlite3.connect(DB)
     cur = conn.cursor()
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS events (
             time TEXT,
@@ -13,9 +15,11 @@ def record_event(status, message):
             message TEXT
         )
     """)
+
     cur.execute(
-        "INSERT INTO events VALUES (?,?,?)",
-        (datetime.now().isoformat(), status, message)
+        "INSERT INTO events VALUES (?, ?, ?)",
+        (datetime.utcnow().isoformat(), status, message)
     )
+
     conn.commit()
     conn.close()
