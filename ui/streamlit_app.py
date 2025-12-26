@@ -98,13 +98,11 @@ if st.button("Validate & Execute"):
             explanation = result["explanation"]
 
             st.markdown("### ❓ Why was this blocked?")
-            st.json({
-                "Rule": explanation["rule"],
-                "Field": explanation["field"],
-                "Severity": explanation["severity"],
-                "Impact": explanation["impact"],
-                "Message": explanation["message"]
-            })
+            st.json(explanation)
+
+            if "diagnosis" in result and result["diagnosis"]:
+            st.markdown("### 📍 Where is the problem?")
+            st.json(result["diagnosis"])
 
             st.info(
                 "Fix the issue in the source data and re-run. "
@@ -131,3 +129,4 @@ if st.button("Validate & Execute"):
                     )
             except Exception:
                 st.warning("Output generated but could not be loaded for download.")
+
