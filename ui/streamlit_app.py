@@ -1,7 +1,9 @@
 import sys
 import os
 
-# Fix Python path for Render
+# -------------------------------
+# Fix Python path (RENDER SAFE)
+# -------------------------------
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )
@@ -9,35 +11,44 @@ sys.path.append(
 import streamlit as st
 from app import run_intentguard
 
-st.set_page_config(page_title="INTENTGUARD", layout="centered")
+# -------------------------------
+# PAGE CONFIG
+# -------------------------------
+st.set_page_config(
+    page_title="INTENTGUARD",
+    layout="centered"
+)
 
-st.title("🛡️ INTENTGUARD – Data Execution Safety")
+st.title("🛡️ INTENTGUARD")
+st.caption("Prevention-first data execution")
 
-# -----------------------
-# Upload
-# -----------------------
+# -------------------------------
+# FILE UPLOAD
+# -------------------------------
+st.subheader("1️⃣ Upload Data")
+
 uploaded_file = st.file_uploader(
     "Upload CSV or Excel file",
     type=["csv", "xlsx"]
 )
 
-# -----------------------
-# Intent Section
-# -----------------------
-st.subheader("🧠 Define Intent")
+# -------------------------------
+# INTENT DEFINITION
+# -------------------------------
+st.subheader("2️⃣ Define Intent")
 
 unique_columns = st.text_input(
-    "Columns that must be UNIQUE (comma separated)",
+    "Columns that must be UNIQUE",
     placeholder="customer_id"
 )
 
 required_columns = st.text_input(
-    "Required columns (comma separated)",
+    "Required columns",
     placeholder="customer_id,email"
 )
 
 clean_required = st.checkbox(
-    "Clean data before output",
+    "Clean data if validation passes",
     value=True
 )
 
@@ -52,12 +63,14 @@ output_path = st.text_input(
     value="data/output"
 )
 
-# -----------------------
-# Execute
-# -----------------------
+# -------------------------------
+# EXECUTION
+# -------------------------------
+st.subheader("3️⃣ Execute")
+
 if st.button("Validate & Execute"):
     if uploaded_file is None:
-        st.error("Please upload a file")
+        st.error("❌ Please upload a file first")
     else:
         intent_input = {
             "unique_columns": [c.strip() for c in unique_columns.split(",") if c.strip()],
@@ -66,19 +79,48 @@ if st.button("Validate & Execute"):
             "max_rows": max_rows if max_rows > 0 else None
         }
 
-        result = run_intentguard(
-            file=uploaded_file,
-            intent_input=intent_input,
-            output_path=output_path
-        )
+        with st.spinner("Validating data against intent..."):
+            result = run_intentguard(
+                file=uploaded_file,
+                intent_input=intent_input,
+                output_path=output_path
+            )
 
+        # -------------------------------
+        # RESULT HANDLING (V2.1)
+        # -------------------------------
+        st.divider()
         st.subheader("Result")
-        st.json(result)
 
-        # -----------------------
-        # Download Output (CRITICAL FOR RENDER)
-        # -----------------------
-        if result["status"] == "SUCCESS":
+        if result["status"] == "BLOCKED":
+            st.error("🚫 Execution Blocked")
+
+            explanation = result["explanation"]
+
+            st.markdown("### ❓ Why was this blocked?")
+            st.json({
+                "Rule": explanation["rule"],
+                "Field": explanation["field"],
+                "Severity": explanation["severity"],
+                "Impact": explanation["impact"],
+                "Message": explanation["message"]
+            })
+
+            st.info(
+                "Fix the issue in the source data and re-run. "
+                "Correction & resume will be added in V2.3."
+            )
+
+        else:
+            st.success("✅ Execution Successful")
+            st.json({
+                "Rows processed": result["rows"],
+                "Output file": result["output"]
+            })
+
+            # -------------------------------
+            # DOWNLOAD (RENDER SAFE)
+            # -------------------------------
             try:
                 with open(result["output"], "rb") as f:
                     st.download_button(
@@ -87,6 +129,5 @@ if st.button("Validate & Execute"):
                         file_name=os.path.basename(result["output"]),
                         mime="text/csv"
                     )
-            except Exception as e:
-                st.warning("Output generated but could not be loaded for download")
-                st.exception(e)
+            except Exception:
+                st.warning("Output generated but could not be loaded for download.")
