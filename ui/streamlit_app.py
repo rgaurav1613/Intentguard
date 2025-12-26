@@ -1,6 +1,10 @@
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Fix Python path for Render
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+)
 
 import streamlit as st
 from app import run_intentguard
@@ -9,8 +13,17 @@ st.set_page_config(page_title="INTENTGUARD", layout="centered")
 
 st.title("🛡️ INTENTGUARD – Data Execution Safety")
 
-uploaded_file = st.file_uploader("Upload CSV or Excel")
+# -----------------------
+# Upload
+# -----------------------
+uploaded_file = st.file_uploader(
+    "Upload CSV or Excel file",
+    type=["csv", "xlsx"]
+)
 
+# -----------------------
+# Intent Section
+# -----------------------
 st.subheader("🧠 Define Intent")
 
 unique_columns = st.text_input(
@@ -23,7 +36,10 @@ required_columns = st.text_input(
     placeholder="customer_id,email"
 )
 
-clean_required = st.checkbox("Clean data before output", value=True)
+clean_required = st.checkbox(
+    "Clean data before output",
+    value=True
+)
 
 max_rows = st.number_input(
     "Maximum allowed rows (optional)",
@@ -31,8 +47,14 @@ max_rows = st.number_input(
     step=1000
 )
 
-output_path = st.text_input("Output path", "data/output")
+output_path = st.text_input(
+    "Output path (internal)",
+    value="data/output"
+)
 
+# -----------------------
+# Execute
+# -----------------------
 if st.button("Validate & Execute"):
     if uploaded_file is None:
         st.error("Please upload a file")
@@ -52,3 +74,19 @@ if st.button("Validate & Execute"):
 
         st.subheader("Result")
         st.json(result)
+
+        # -----------------------
+        # Download Output (CRITICAL FOR RENDER)
+        # -----------------------
+        if result["status"] == "SUCCESS":
+            try:
+                with open(result["output"], "rb") as f:
+                    st.download_button(
+                        label="⬇️ Download Output CSV",
+                        data=f,
+                        file_name=os.path.basename(result["output"]),
+                        mime="text/csv"
+                    )
+            except Exception as e:
+                st.warning("Output generated but could not be loaded for download")
+                st.exception(e)
