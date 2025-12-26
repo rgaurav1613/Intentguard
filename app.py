@@ -16,6 +16,7 @@ from core.memory import record_event
 def run_intentguard(file, intent_input, output_path):
     """
     Core execution engine for INTENTGUARD
+    V2.2: Explainability + Diagnosis
     """
 
     # 1. Load input
@@ -24,24 +25,26 @@ def run_intentguard(file, intent_input, output_path):
     # 2. Parse intent (user-defined, authoritative)
     intent = parse_intent(intent_input)
 
-    # 3. Validate against intent (V2.1 explainability)
+    # 3. Validate against intent
     validation = validate_data(df, intent)
+
     if not validation["ok"]:
         explanation = validation["explanation"]
+        diagnosis = validation.get("diagnosis")
 
-        # Audit log
+        # Audit
         record_event(
             "BLOCKED",
             f"{explanation['rule']} - {explanation['message']}"
         )
 
-        # Stop execution with explanation
         return {
-    "status": "BLOCKED",
-    "explanation": explanation,
-    "diagnosis": validation.get("diagnosis")
-  }
-    # 4. Clean data (only if validation passed)
+            "status": "BLOCKED",
+            "explanation": explanation,
+            "diagnosis": diagnosis
+        }
+
+    # 4. Clean data (only if allowed)
     clean_df = clean_data(df, intent)
 
     # 5. Deliver output
@@ -50,7 +53,6 @@ def run_intentguard(file, intent_input, output_path):
     # 6. Audit success
     record_event("SUCCESS", f"Output written to {output_file}")
 
-    # 7. Final success response
     return {
         "status": "SUCCESS",
         "rows": len(clean_df),
