@@ -1,4 +1,9 @@
-def clean_data(df):
+def clean_data(df, intent):
+
+    if not intent["quality"]["clean"]:
+        return df
+
     df = df.drop_duplicates()
-    df.columns = [c.strip().lower() for c in df.columns]
+    df = df.dropna()
+
     return df
