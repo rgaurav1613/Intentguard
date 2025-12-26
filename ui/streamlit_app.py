@@ -1,9 +1,9 @@
 import sys
 import os
 
-# -------------------------------
+# ---------------------------------
 # FIX PYTHON PATH (RENDER SAFE)
-# -------------------------------
+# ---------------------------------
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )
@@ -11,9 +11,9 @@ sys.path.append(
 import streamlit as st
 from app import run_intentguard
 
-# -------------------------------
+# ---------------------------------
 # PAGE CONFIG
-# -------------------------------
+# ---------------------------------
 st.set_page_config(
     page_title="INTENTGUARD",
     layout="centered"
@@ -22,9 +22,9 @@ st.set_page_config(
 st.title("🛡️ INTENTGUARD")
 st.caption("Block → Diagnose → (Correct → Resume)")
 
-# -------------------------------
-# UPLOAD
-# -------------------------------
+# ---------------------------------
+# 1️⃣ FILE UPLOAD
+# ---------------------------------
 st.subheader("1️⃣ Upload Data")
 
 uploaded_file = st.file_uploader(
@@ -32,9 +32,9 @@ uploaded_file = st.file_uploader(
     type=["csv", "xlsx", "xls", "tsv", "json"]
 )
 
-# -------------------------------
-# INTENT
-# -------------------------------
+# ---------------------------------
+# 2️⃣ DEFINE INTENT
+# ---------------------------------
 st.subheader("2️⃣ Define Intent")
 
 unique_columns = st.text_input(
@@ -63,14 +63,16 @@ output_path = st.text_input(
     value="data/output"
 )
 
-# -------------------------------
-# EXECUTE
-# -------------------------------
+# ---------------------------------
+# 3️⃣ EXECUTE
+# ---------------------------------
 st.subheader("3️⃣ Execute")
 
 if st.button("Validate & Execute"):
+
     if uploaded_file is None:
         st.error("❌ Please upload a file")
+
     else:
         # Normalize intent inputs (IMPORTANT)
         intent_input = {
@@ -90,30 +92,32 @@ if st.button("Validate & Execute"):
         st.divider()
         st.subheader("Result")
 
-        # -------------------------------
-        # BLOCKED
-        # -------------------------------
-    if result["status"] == "BLOCKED":
-        st.error("🚫 Execution Blocked")
+        # ---------------------------------
+        # 🚫 BLOCKED CASE
+        # ---------------------------------
+        if result["status"] == "BLOCKED":
 
-        st.markdown("### ❓ Why was this blocked?")
-        st.json(result["explanation"])
+            st.error("🚫 Execution Blocked")
 
-    if result.get("diagnosis"):
-        st.markdown("### 📍 Where is the problem?")
-        st.json(result["diagnosis"])
-    else:
-        st.info("No location diagnostics available for this rule.")
+            st.markdown("### ❓ Why was this blocked?")
+            st.json(result["explanation"])
 
-    st.info(
-        "Fix the issue in the source data and re-run. "
-        "Inline correction & resume will be added in the next V2 step."
-        )
+            if result.get("diagnosis") is not None:
+                st.markdown("### 📍 Where is the problem?")
+                st.json(result["diagnosis"])
+            else:
+                st.info("No location diagnostics available for this rule.")
 
-        # -------------------------------
-        # SUCCESS
-        # -------------------------------
+            st.info(
+                "Fix the issue in the source data and re-run. "
+                "Inline correction & resume will be added in the next V2 step."
+            )
+
+        # ---------------------------------
+        # ✅ SUCCESS CASE
+        # ---------------------------------
         else:
+
             st.success("✅ Execution Successful")
 
             st.json({
@@ -121,7 +125,7 @@ if st.button("Validate & Execute"):
                 "Output file": result["output"]
             })
 
-            # Download (Render-safe)
+            # Render-safe download
             try:
                 with open(result["output"], "rb") as f:
                     st.download_button(
@@ -131,7 +135,6 @@ if st.button("Validate & Execute"):
                         mime="text/csv"
                     )
             except Exception:
-                st.warning("Output generated but could not be loaded for download.")
-
-
-
+                st.warning(
+                    "Output generated but could not be loaded for download."
+                )
