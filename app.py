@@ -37,10 +37,10 @@ def run_intentguard(file, intent_input, output_path):
 
         # Stop execution with explanation
         return {
-            "status": "BLOCKED",
-            "explanation": explanation
-        }
-
+    "status": "BLOCKED",
+    "explanation": explanation,
+    "diagnosis": validation.get("diagnosis")
+  }
     # 4. Clean data (only if validation passed)
     clean_df = clean_data(df, intent)
 
