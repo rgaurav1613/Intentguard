@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 st.title("🛡️ INTENTGUARD")
-st.caption("Block → Diagnose → (Correct → Resume)")
+st.caption("Block → Diagnose → Compare → (Correct → Resume)")
 
 # ---------------------------------
 # 1️⃣ FILE UPLOAD
@@ -44,7 +44,7 @@ unique_columns = st.text_input(
 
 required_columns = st.text_input(
     "Required columns (comma separated)",
-    placeholder="name,email"
+    placeholder="email"
 )
 
 clean_required = st.checkbox(
@@ -92,30 +92,85 @@ if st.button("Validate & Execute"):
         st.divider()
         st.subheader("Result")
 
-        # ---------------------------------
-        # 🚫 BLOCKED CASE
-        # ---------------------------------
+        # =========================================================
+        # 🚫 BLOCKED CASE — V2.1 + V2.2 + V2.3
+        # =========================================================
         if result["status"] == "BLOCKED":
+
+            explanation = result["explanation"]
+            diagnosis = result.get("diagnosis")
 
             st.error("🚫 Execution Blocked")
 
+            # -----------------------------
+            # WHY (V2.1)
+            # -----------------------------
             st.markdown("### ❓ Why was this blocked?")
-            st.json(result["explanation"])
+            st.json(explanation)
 
-            if result.get("diagnosis") is not None:
+            # -----------------------------
+            # WHERE (V2.2)
+            # -----------------------------
+            if diagnosis:
                 st.markdown("### 📍 Where is the problem?")
-                st.json(result["diagnosis"])
+                st.json(diagnosis)
             else:
                 st.info("No location diagnostics available for this rule.")
+
+            # -----------------------------
+            # EXPECTED vs ACTUAL (V2.3)
+            # -----------------------------
+            st.markdown("### 🔍 Expected vs Actual")
+
+            expected = []
+            actual = []
+
+            rule = explanation["rule"]
+
+            # REQUIRED COLUMN
+            if rule == "REQUIRED_COLUMN_MISSING":
+                expected.append(
+                    f"Column '{explanation['field']}' must exist"
+                )
+                actual.append(
+                    "❌ Column not found in data"
+                )
+
+            # UNIQUE CONSTRAINT
+            elif rule == "UNIQUE_CONSTRAINT_VIOLATION":
+                expected.append(
+                    f"Column '{explanation['field']}' must be unique"
+                )
+                actual.append(
+                    f"Duplicate values found "
+                    f"({diagnosis['estimated_affected_rows']} rows affected)"
+                )
+
+            # ROW LIMIT
+            elif rule == "ROW_LIMIT_EXCEEDED":
+                expected.append(
+                    "Row count must be within allowed limit"
+                )
+                actual.append(
+                    f"Exceeded by {diagnosis['estimated_affected_rows']} rows"
+                )
+
+            # Render comparison table
+            compare_table = {
+                "Expected (Intent)": expected,
+                "Actual (Data)": actual
+            }
+
+            st.table(compare_table)
 
             st.info(
                 "Fix the issue in the source data and re-run. "
                 "Inline correction & resume will be added in the next V2 step."
             )
 
-        # ---------------------------------
+        # =========================================================
         # ✅ SUCCESS CASE
-        # ---------------------------------
+        # =========================================================
         else:
 
             st.success("✅ Execution Successful")
