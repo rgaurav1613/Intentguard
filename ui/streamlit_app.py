@@ -93,7 +93,7 @@ if st.button("Validate & Execute"):
         # -------------------------------
         # BLOCKED
         # -------------------------------
-        if result["status"] == "BLOCKED":
+    if result["status"] == "BLOCKED":
     st.error("🚫 Execution Blocked")
 
     st.markdown("### ❓ Why was this blocked?")
@@ -132,4 +132,5 @@ if st.button("Validate & Execute"):
                     )
             except Exception:
                 st.warning("Output generated but could not be loaded for download.")
+
 
