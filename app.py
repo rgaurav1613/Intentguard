@@ -5,8 +5,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # app.py
 
-# app.py
-
 from datetime import datetime
 
 from core.intake import load_input
@@ -64,9 +62,11 @@ def run_intentguard(
 ):
     """
     INTENTGUARD core engine
-    - Fresh execution
+
+    Capabilities:
+    - SCHEMA v1.0 compliant output
+    - MULTI-rule validation
     - Stateful resume
-    - Schema v1.0 compliant output
     """
 
     # -----------------------------
@@ -88,12 +88,12 @@ def run_intentguard(
         if not state:
             return build_response(
                 status="ERROR",
+                execution_id=execution_id,
                 decision={
                     "severity": "CRITICAL",
                     "action": "BLOCK",
                     "summary": "Invalid execution_id"
-                },
-                execution_id=execution_id
+                }
             )
 
         validation = validate_data(df, state["intent"])
@@ -103,21 +103,18 @@ def run_intentguard(
                 status="BLOCKED",
                 execution_id=execution_id,
                 decision={
-                    "severity": validation["explanation"]["severity"],
+                    "severity": validation["highest_severity"],
                     "action": "BLOCK",
-                    "summary": validation["explanation"]["message"]
+                    "summary": f"{len(validation['violations'])} validation issues detected"
                 },
-                violations=[{
-                    "explanation": validation["explanation"],
-                    "diagnosis": validation["diagnosis"]
-                }],
+                violations=validation["violations"],
                 schema_snapshot=validation["schema_snapshot"]
             )
 
         mark_resumed(execution_id)
 
     # =================================================
-    # NORMAL VALIDATION FLOW
+    # NORMAL VALIDATION FLOW (MULTI-RULE)
     # =================================================
     validation = validate_data(df, intent)
 
@@ -125,31 +122,28 @@ def run_intentguard(
         execution_id = create_state(
             schema_snapshot=validation["schema_snapshot"],
             intent=intent,
-            reason=validation["explanation"]["message"]
+            reason="Multiple validation violations detected"
         )
 
         record_event(
             "BLOCKED",
-            validation["explanation"]["message"]
+            f"{len(validation['violations'])} validation issues detected"
         )
 
         return build_response(
             status="BLOCKED",
             execution_id=execution_id,
             decision={
-                "severity": validation["explanation"]["severity"],
+                "severity": validation["highest_severity"],
                 "action": "BLOCK",
-                "summary": validation["explanation"]["message"]
+                "summary": f"{len(validation['violations'])} validation issues detected"
             },
-            violations=[{
-                "explanation": validation["explanation"],
-                "diagnosis": validation["diagnosis"]
-            }],
+            violations=validation["violations"],
             schema_snapshot=validation["schema_snapshot"]
         )
 
     # =================================================
-    # CLEAN DATA
+    # CLEAN DATA (SAFE PATH)
     # =================================================
     clean_df = clean_data(df, intent)
 
