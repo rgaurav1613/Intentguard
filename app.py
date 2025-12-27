@@ -5,6 +5,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # app.py
 
+# app.py
+
+from datetime import datetime
+
 from core.intake import load_input
 from core.intent import parse_intent
 from core.validator import validate_data
@@ -19,11 +23,39 @@ from core.state import (
 )
 
 # -------------------------------------------------
-# Initialize persistent execution state store
+# Initialize execution state storage
 # -------------------------------------------------
 init_state_store()
 
 
+# -------------------------------------------------
+# SCHEMA v1.0 RESPONSE BUILDER
+# -------------------------------------------------
+def build_response(
+    *,
+    status,
+    decision,
+    execution_id=None,
+    violations=None,
+    schema_snapshot=None,
+    output=None
+):
+    return {
+        "contract_version": "1.0",
+        "tool": "INTENTGUARD",
+        "decision_time": datetime.utcnow().isoformat() + "Z",
+        "status": status,
+        "execution_id": execution_id,
+        "decision": decision,
+        "violations": violations or [],
+        "schema_snapshot": schema_snapshot,
+        "output": output
+    }
+
+
+# -------------------------------------------------
+# MAIN EXECUTION ENGINE
+# -------------------------------------------------
 def run_intentguard(
     file,
     intent_input,
@@ -31,10 +63,10 @@ def run_intentguard(
     execution_id=None
 ):
     """
-    Main INTENTGUARD execution engine.
-    Supports:
+    INTENTGUARD core engine
     - Fresh execution
-    - Resume after correction (stateful)
+    - Stateful resume
+    - Schema v1.0 compliant output
     """
 
     # -----------------------------
@@ -48,28 +80,40 @@ def run_intentguard(
     intent = parse_intent(intent_input)
 
     # =================================================
-    # RESUME FLOW (if execution_id provided)
+    # RESUME FLOW
     # =================================================
     if execution_id:
         state = load_state(execution_id)
 
         if not state:
-            return {
-                "status": "ERROR",
-                "message": "Invalid execution_id"
-            }
+            return build_response(
+                status="ERROR",
+                decision={
+                    "severity": "CRITICAL",
+                    "action": "BLOCK",
+                    "summary": "Invalid execution_id"
+                },
+                execution_id=execution_id
+            )
 
         validation = validate_data(df, state["intent"])
 
         if not validation["ok"]:
-            return {
-                "status": "BLOCKED",
-                "explanation": validation["explanation"],
-                "diagnosis": validation["diagnosis"],
-                "execution_id": execution_id
-            }
+            return build_response(
+                status="BLOCKED",
+                execution_id=execution_id,
+                decision={
+                    "severity": validation["explanation"]["severity"],
+                    "action": "BLOCK",
+                    "summary": validation["explanation"]["message"]
+                },
+                violations=[{
+                    "explanation": validation["explanation"],
+                    "diagnosis": validation["diagnosis"]
+                }],
+                schema_snapshot=validation["schema_snapshot"]
+            )
 
-        # Resume allowed
         mark_resumed(execution_id)
 
     # =================================================
@@ -89,16 +133,23 @@ def run_intentguard(
             validation["explanation"]["message"]
         )
 
-        return {
-            "status": "BLOCKED",
-            "explanation": validation["explanation"],
-            "diagnosis": validation["diagnosis"],
-            "schema_snapshot": validation["schema_snapshot"],
-            "execution_id": execution_id
-        }
+        return build_response(
+            status="BLOCKED",
+            execution_id=execution_id,
+            decision={
+                "severity": validation["explanation"]["severity"],
+                "action": "BLOCK",
+                "summary": validation["explanation"]["message"]
+            },
+            violations=[{
+                "explanation": validation["explanation"],
+                "diagnosis": validation["diagnosis"]
+            }],
+            schema_snapshot=validation["schema_snapshot"]
+        )
 
     # =================================================
-    # CLEAN DATA (SAFE PATH)
+    # CLEAN DATA
     # =================================================
     clean_df = clean_data(df, intent)
 
@@ -112,8 +163,15 @@ def run_intentguard(
         f"Output written to {output_file}"
     )
 
-    return {
-        "status": "SUCCESS",
-        "rows_processed": len(clean_df),
-        "output_path": output_file
-    }
+    return build_response(
+        status="SUCCESS",
+        decision={
+            "severity": "LOW",
+            "action": "ALLOW",
+            "summary": "Execution completed successfully"
+        },
+        output={
+            "rows_processed": len(clean_df),
+            "output_path": output_file
+        }
+    )
