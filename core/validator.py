@@ -1,5 +1,13 @@
 # core/validator.py
 
+SEVERITY_ORDER = {
+    "LOW": 1,
+    "MEDIUM": 2,
+    "HIGH": 3,
+    "CRITICAL": 4
+}
+
+
 def _diagnose_missing_column(df, column):
     return {
         "issue_type": "MISSING_COLUMN",
@@ -47,8 +55,11 @@ def _diagnose_row_limit(df, max_rows):
 
 def validate_data(df, intent):
     """
-    Validate data and return explainability + diagnosis on failure.
+    MULTI-rule validator.
+    Collects ALL violations instead of failing fast.
     """
+
+    violations = []
 
     schema_snapshot = {
         "columns": list(df.columns),
@@ -61,9 +72,7 @@ def validate_data(df, intent):
     # -----------------------------
     for col in intent["presence"]["required"]:
         if col not in df.columns:
-            return {
-                "ok": False,
-                "schema_snapshot": schema_snapshot,
+            violations.append({
                 "explanation": {
                     "rule": "REQUIRED_COLUMN_MISSING",
                     "field": col,
@@ -72,16 +81,14 @@ def validate_data(df, intent):
                     "message": f"Required column '{col}' is missing"
                 },
                 "diagnosis": _diagnose_missing_column(df, col)
-            }
+            })
 
     # -----------------------------
     # UNIQUE CONSTRAINTS
     # -----------------------------
     for col in intent["identity"]["unique"]:
         if col in df.columns and df[col].duplicated().any():
-            return {
-                "ok": False,
-                "schema_snapshot": schema_snapshot,
+            violations.append({
                 "explanation": {
                     "rule": "UNIQUE_CONSTRAINT_VIOLATION",
                     "field": col,
@@ -90,23 +97,36 @@ def validate_data(df, intent):
                     "message": f"Duplicate values found in column '{col}'"
                 },
                 "diagnosis": _diagnose_duplicates(df, col)
-            }
+            })
 
     # -----------------------------
-    # MAX ROWS
+    # MAX ROW LIMIT
     # -----------------------------
     max_rows = intent["risk"].get("max_rows")
     if max_rows and len(df) > max_rows:
-        return {
-            "ok": False,
-            "schema_snapshot": schema_snapshot,
+        violations.append({
             "explanation": {
                 "rule": "ROW_LIMIT_EXCEEDED",
+                "field": None,
                 "severity": "MEDIUM",
                 "impact": "Execution stopped",
                 "message": f"Row count {len(df)} exceeds allowed maximum {max_rows}"
             },
             "diagnosis": _diagnose_row_limit(df, max_rows)
+        })
+
+    if violations:
+        highest_severity = max(
+            v["explanation"]["severity"]
+            for v in violations
+            key=lambda s: SEVERITY_ORDER[s]
+        )
+
+        return {
+            "ok": False,
+            "violations": violations,
+            "schema_snapshot": schema_snapshot,
+            "highest_severity": highest_severity
         }
 
     return {"ok": True}
