@@ -26,9 +26,7 @@ def _diagnose_duplicates(df, column, sample_size=5):
     sample = dup_rows.head(sample_size)
 
     if len(dup_rows) > 0:
-        first_idx = int(dup_rows.index.min())
-        last_idx = int(dup_rows.index.max())
-        row_range = f"Rows ~{first_idx} to ~{last_idx}"
+        row_range = f"Rows ~{int(dup_rows.index.min())} to ~{int(dup_rows.index.max())}"
     else:
         row_range = "Unknown"
 
@@ -46,7 +44,7 @@ def _diagnose_row_limit(df, max_rows):
     return {
         "issue_type": "ROW_LIMIT_EXCEEDED",
         "column": None,
-        "estimated_affected_rows": len(df) - max_rows,
+        "estimated_affected_rows": max(0, len(df) - max_rows),
         "row_range": f"Rows > {max_rows}",
         "sample_rows": [],
         "sample_values": []
@@ -55,8 +53,8 @@ def _diagnose_row_limit(df, max_rows):
 
 def validate_data(df, intent):
     """
-    MULTI-rule validator.
-    Collects ALL violations instead of failing fast.
+    MULTI-rule validator
+    Returns all violations in one run
     """
 
     violations = []
@@ -70,7 +68,7 @@ def validate_data(df, intent):
     # -----------------------------
     # REQUIRED COLUMNS
     # -----------------------------
-    for col in intent["presence"]["required"]:
+    for col in intent.get("presence", {}).get("required", []):
         if col not in df.columns:
             violations.append({
                 "explanation": {
@@ -86,7 +84,7 @@ def validate_data(df, intent):
     # -----------------------------
     # UNIQUE CONSTRAINTS
     # -----------------------------
-    for col in intent["identity"]["unique"]:
+    for col in intent.get("identity", {}).get("unique", []):
         if col in df.columns and df[col].duplicated().any():
             violations.append({
                 "explanation": {
@@ -100,10 +98,10 @@ def validate_data(df, intent):
             })
 
     # -----------------------------
-    # MAX ROW LIMIT
+    # ROW LIMIT
     # -----------------------------
-    max_rows = intent["risk"].get("max_rows")
-    if max_rows and len(df) > max_rows:
+    max_rows = intent.get("risk", {}).get("max_rows")
+    if max_rows is not None and len(df) > max_rows:
         violations.append({
             "explanation": {
                 "rule": "ROW_LIMIT_EXCEEDED",
@@ -115,10 +113,12 @@ def validate_data(df, intent):
             "diagnosis": _diagnose_row_limit(df, max_rows)
         })
 
+    # -----------------------------
+    # FINAL DECISION
+    # -----------------------------
     if violations:
         highest_severity = max(
-            v["explanation"]["severity"]
-            for v in violations
+            (v["explanation"]["severity"] for v in violations),
             key=lambda s: SEVERITY_ORDER[s]
         )
 
